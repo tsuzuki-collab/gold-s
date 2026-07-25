@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>買取計算書 発行システム — GOLD・S</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Shippori+Mincho:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#211E19;         /* 墨（温かみのある黒） */
+  --velvet:#16140F;      /* ベルベット黒（背景） */
+  --paper:#FBF9F3;       /* 象牙紙 */
+  --gold:#9F7E33;        /* シャンパンゴールド */
+  --gold-deep:#7C6226;
+  --gold-line:#C9B57A;   /* 金の細罫 */
+  --gold-soft:#F6F1E2;
+  --pt:#8B8578;          /* 灰（プラチナ） */
+  --line:#DFDACD;        /* 髪の毛罫 */
+  --line-strong:#3A362E;
+  --danger:#A0392E;
+  --sans:"Noto Sans JP","Yu Gothic","Hiragino Kaku Gothic ProN",sans-serif;
+  --serif:"Shippori Mincho","Yu Mincho","YuMincho","Hiragino Mincho ProN","MS PMincho",serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--velvet);font-family:var(--sans);color:var(--ink)}
+input,select,textarea,button{font-family:var(--sans);color:var(--ink)}
+input:focus,select:focus{outline:1.5px solid var(--gold);outline-offset:-1px;background:#FFFDF2}
+
+/* ===== ツールバー ===== */
+.toolbar{position:sticky;top:0;z-index:50;background:var(--velvet);color:#E8E3D5;
+  display:flex;align-items:center;gap:10px;padding:12px 18px;flex-wrap:wrap;
+  border-bottom:1px solid rgba(201,181,122,.35)}
+.toolbar .brand{font-family:var(--serif);font-weight:800;font-size:16px;letter-spacing:.22em}
+.toolbar .brand b{color:var(--gold-line)}
+.toolbar .spacer{flex:1}
+.btn{border:1px solid rgba(201,181,122,.4);background:transparent;color:#E8E3D5;border-radius:2px;
+  padding:9px 16px;font-size:12.5px;font-weight:500;letter-spacing:.08em;cursor:pointer;transition:.18s}
+.btn:hover{border-color:var(--gold-line);color:#fff;background:rgba(159,126,51,.12)}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:#16140F;font-weight:700}
+.btn.primary:hover{background:#B49242}
+.btn.ghost{background:transparent}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(80px);
+  background:#211E19;color:#F1EDE1;padding:12px 24px;border-radius:2px;font-size:13px;
+  border:1px solid var(--gold-line);opacity:0;transition:.3s;z-index:99;pointer-events:none;letter-spacing:.04em}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* ===== 用紙 ===== */
+.stage{display:flex;justify-content:center;padding:34px 12px 90px}
+.sheet{background:var(--paper);width:900px;max-width:100%;padding:42px 46px 46px;
+  border:1px solid var(--gold-line);
+  outline:1px solid rgba(159,126,51,.35);outline-offset:-8px;
+  box-shadow:0 30px 70px rgba(0,0,0,.55)}
+.sheet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.title{font-family:var(--serif);font-weight:800;font-size:31px;letter-spacing:.6em;
+  text-indent:.6em;text-align:center;flex:1;padding-top:6px}
+.title small{display:block;font-size:10px;letter-spacing:.42em;color:var(--gold-deep);
+  font-family:var(--sans);font-weight:500;margin-top:8px}
+.company{font-size:10.5px;line-height:1.8;text-align:left;min-width:215px;color:#4A463D}
+.company .name{font-family:var(--serif);font-size:15px;font-weight:700;letter-spacing:.1em;color:var(--ink)}
+.company .name b{color:var(--gold-deep)}
+.meta-row{display:flex;justify-content:space-between;align-items:flex-end;margin-top:20px;gap:16px;flex-wrap:wrap;
+  padding-top:16px;border-top:1px solid var(--line)}
+.field{display:flex;align-items:center;gap:8px;font-size:13px}
+.field label{color:#6E6A5E;font-size:11.5px;letter-spacing:.1em;white-space:nowrap}
+.field input[type=text],.field input[type=date]{border:none;border-bottom:1px solid var(--line-strong);
+  background:transparent;padding:3px 6px;font-size:13.5px}
+.field .denpyo{width:150px;letter-spacing:.08em;font-variant-numeric:tabular-nums}
+.seller{display:flex;align-items:baseline;gap:8px}
+.seller input{border:none;border-bottom:1px solid var(--line-strong);background:transparent;
+  font-family:var(--serif);font-size:18px;font-weight:600;width:270px;padding:2px 6px;letter-spacing:.04em}
+.seller span{font-size:13.5px}
+
+/* ===== 本日の単価表 ===== */
+.ratebar{margin-top:20px;border:1px solid var(--gold-line);background:var(--gold-soft)}
+.ratebar-head{display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;user-select:none}
+.ratebar-head .tt{font-family:var(--serif);font-size:13px;font-weight:700;letter-spacing:.14em;color:var(--gold-deep)}
+.ratebar-head .hint{font-size:10.5px;color:#8B8265;letter-spacing:.03em}
+.ratebar-head .tg{margin-left:auto;font-size:11.5px;font-weight:700;color:#16140F;background:var(--gold-line);border:1px solid var(--gold);border-radius:2px;padding:6px 16px;letter-spacing:.14em}
+.ratebar-head:hover .tg{background:#D6C48C}
+.ratebar-head .tg2{font-size:11.5px;font-weight:700;color:var(--gold-deep);background:#fff;border:1px solid var(--gold);border-radius:2px;padding:6px 14px;letter-spacing:.1em;margin-left:12px}
+#btnRatioSet{margin-left:auto}
+.ratebar-head .tg2:hover{background:var(--gold-soft)}
+.ratebar-head .tg{margin-left:12px}
+.rate-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border-top:1px solid var(--gold-line)}
+.rate-cat{grid-column:1/-1;background:var(--paper);color:var(--gold-deep);font-family:var(--serif);
+  font-size:11px;font-weight:700;letter-spacing:.2em;padding:7px 14px 4px;border-bottom:1px solid var(--gold-line)}
+.rate-cell{background:#fff;padding:7px 12px;display:flex;flex-direction:column;gap:2px}
+.rate-cell.base{background:#FAF4E2}
+.rate-cell.base label{color:var(--gold-deep);font-weight:700}
+.rate-cell.manual input{color:var(--danger)}
+.rate-cell label{font-size:10.5px;color:#6E6A5E;white-space:nowrap;letter-spacing:.02em}
+.rate-cell input{border:none;border-bottom:1px solid var(--line);text-align:right;
+  font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;background:transparent;padding:2px 4px;width:100%}
+.ratebar.closed .rate-grid{display:none}
+
+/* ===== 明細 ===== */
+table.items{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px;
+  border-top:2px solid var(--ink);border-bottom:1px solid var(--ink)}
+table.items th{background:transparent;color:var(--ink);font-family:var(--serif);font-weight:700;font-size:12px;
+  padding:9px 6px 7px;border-bottom:1.5px solid var(--ink);letter-spacing:.18em}
+table.items td{border-bottom:1px solid var(--line);border-left:1px solid var(--line);padding:0;height:36px;background:transparent}
+table.items td:first-child{border-left:none}
+table.items td.no{width:36px;text-align:center;color:var(--pt);font-variant-numeric:tabular-nums;font-size:11.5px}
+table.items input,table.items select{width:100%;height:36px;border:none;background:transparent;padding:0 9px;font-size:13px}
+table.items select{appearance:none;-webkit-appearance:none;cursor:pointer}
+td.c-kind{width:98px}
+td.c-detail{width:172px}
+td.c-weight{width:88px}
+td.c-price{width:98px}
+td.c-amount{width:124px}
+td.c-weight input,td.c-price input,td.c-amount input{text-align:right;font-variant-numeric:tabular-nums}
+td.c-amount{background:var(--gold-soft)!important}
+td.c-amount input{font-weight:700}
+.row-tools{width:30px;text-align:center;border:none!important;background:transparent!important}
+.row-del{border:none;background:none;color:#CFC9B9;cursor:pointer;font-size:14px;padding:4px}
+.row-del:hover{color:var(--danger)}
+.add-row{margin-top:10px;background:none;border:none;border-bottom:1px solid var(--line);color:#8B8578;
+  width:100%;padding:9px;cursor:pointer;font-size:11.5px;letter-spacing:.2em}
+.add-row:hover{color:var(--gold-deep);border-color:var(--gold-line)}
+
+/* ===== 合計 ===== */
+.totals{display:flex;justify-content:flex-end;margin-top:18px}
+.totals table{border-collapse:collapse;font-size:13.5px}
+.totals td{padding:8px 16px}
+.totals .lbl{font-family:var(--serif);font-size:12px;letter-spacing:.24em;text-align:left;min-width:130px;color:#57534A}
+.totals .val{text-align:right;min-width:180px;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line)}
+.totals tr.tax .val,.totals tr.tax .lbl{color:var(--pt);font-size:12px}
+.totals tr.grand .lbl{color:var(--ink);font-weight:700;font-size:13.5px}
+.totals tr.grand .val{font-family:var(--serif);font-size:21px;font-weight:800;letter-spacing:.02em;
+  border-top:1px solid var(--ink);border-bottom:3px double var(--ink)}
+
+/* ===== 下段 ===== */
+.lower{display:grid;grid-template-columns:1fr 240px;gap:18px;margin-top:24px}
+.box{border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.box .bx-row{display:flex;border-bottom:1px solid var(--line);align-items:center;min-height:40px}
+.box .bx-row:last-child{border-bottom:none}
+.bx-label{width:100px;font-family:var(--serif);color:var(--ink);font-size:12px;font-weight:700;padding:10px 12px;
+  align-self:stretch;display:flex;align-items:center;letter-spacing:.28em;border-right:1px solid var(--line)}
+.bx-body{flex:1;padding:5px 14px;display:flex;align-items:center;gap:15px;flex-wrap:wrap;font-size:12.5px}
+.chk{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap}
+.chk input{accent-color:var(--gold);width:14px;height:14px}
+.bx-body input[type=text],.bx-body input[type=date]{border:none;border-bottom:1px solid var(--line-strong);background:transparent;padding:2px 5px;font-size:12.5px}
+.staff{border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.staff th{font-family:var(--serif);color:var(--ink);font-weight:700;font-size:12px;padding:9px;
+  border-bottom:1.5px solid var(--ink);letter-spacing:.3em}
+.staff td{border-left:1px solid var(--line);padding:4px;height:64px;vertical-align:middle}
+.staff td:first-child{border-left:none}
+.staff input{width:100%;border:none;text-align:center;font-size:14px;background:transparent;font-family:var(--serif)}
+.staff table{width:100%;border-collapse:collapse}
+
+/* ===== お客様記入欄（画面上は説明のみ） ===== */
+.cust-note{margin-top:22px;border:1px solid var(--gold-line);padding:12px 18px;font-size:12px;color:#6E6A5E;
+  display:flex;gap:10px;align-items:center;background:var(--gold-soft);letter-spacing:.02em}
+.cust-note b{color:var(--gold-deep)}
+
+/* ===== 発行履歴 ===== */
+.hist-ov{position:fixed;inset:0;background:rgba(10,9,6,.72);z-index:80;display:flex;align-items:center;justify-content:center;padding:20px}
+.hist-ov[hidden]{display:none}
+.hist-panel{background:var(--paper);border:1px solid var(--gold-line);width:640px;max-width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.hist-head{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--gold-line)}
+.hist-head .t{font-family:var(--serif);font-weight:700;letter-spacing:.2em;font-size:14px}
+.hist-head button{border:none;background:none;font-size:16px;cursor:pointer;color:#6E6A5E}
+.hist-head .hcsv{border:1px solid var(--gold);color:var(--gold-deep);font-size:11px;padding:5px 14px;letter-spacing:.1em;margin-right:10px}
+.hist-head .hcsv:hover{background:var(--gold-soft)}
+.hist-list{overflow-y:auto;padding:6px 0}
+.hist-row{display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--line);font-size:12.5px}
+.hist-row .dn{font-variant-numeric:tabular-nums;letter-spacing:.04em;min-width:110px}
+.hist-row .sl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-row .tt{font-variant-numeric:tabular-nums;font-weight:700;min-width:110px;text-align:right}
+.hist-row .hbtn{border:1px solid var(--gold);background:none;color:var(--gold-deep);padding:4px 12px;font-size:11px;cursor:pointer;letter-spacing:.1em}
+.hist-row .hbtn:hover{background:var(--gold-soft)}
+.hist-row .hdel{border:none;background:none;color:#C0BAA8;cursor:pointer;font-size:13px}
+.hist-row .hdel:hover{color:var(--danger)}
+.hist-empty{padding:40px;text-align:center;color:#8B8578;font-size:12.5px;letter-spacing:.1em}
+
+/* ===== 印刷用 ===== */
+#printArea{display:none}
+@media print{
+  body>.toolbar,body>.stage,.toast{display:none!important}
+  html,body{background:#fff}
+  #printArea{display:block}
+  .pcopy{page-break-after:always;padding:0;font-size:11px;color:#000;font-family:var(--sans)}
+  .pcopy:last-child{page-break-after:auto}
+  @page{size:A4;margin:13mm 12mm}
+  .p-head{display:flex;justify-content:space-between;align-items:flex-start;
+    border-bottom:3px double #000;padding-bottom:8px}
+  .p-title{font-family:var(--serif);font-weight:800;font-size:25px;letter-spacing:.55em;text-indent:.55em;text-align:center;flex:1}
+  .p-sub{font-size:7.5px;letter-spacing:.5em;text-indent:.5em;text-align:center;margin-top:5px;color:#333}
+  .p-copychk{font-size:10px;margin-top:5px;text-align:center;letter-spacing:.18em}
+  .p-company{font-size:9px;line-height:1.7;min-width:195px;color:#222}
+  .p-company .name{font-family:var(--serif);font-size:13px;font-weight:700;letter-spacing:.08em;color:#000}
+  .p-meta{display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px}
+  .p-meta .l{font-size:11px;line-height:2}
+  .p-seller{font-family:var(--serif);font-size:14.5px;letter-spacing:.06em;border-bottom:1px solid #000;padding:0 44px 2px 6px;display:inline-block}
+  table.p-items{width:100%;border-collapse:collapse;margin-top:9px;border-top:1.5px solid #000;border-bottom:1.5px solid #000}
+  table.p-items th{border-bottom:1px solid #000;font-family:var(--serif);background:#fff;
+    font-size:9.5px;font-weight:700;padding:5px 4px;letter-spacing:.22em}
+  table.p-items td{border-bottom:.5px solid #AAA;border-left:.5px solid #CCC;font-size:10.5px;padding:4px 7px;height:20px}
+  table.p-items td:first-child{border-left:none}
+  table.p-items td.r{text-align:right;font-variant-numeric:tabular-nums}
+  table.p-items td.no{text-align:center;width:26px;color:#666;font-size:9.5px}
+  .p-totals{display:flex;justify-content:flex-end;margin-top:9px}
+  .p-totals table{border-collapse:collapse;font-size:11px}
+  .p-totals td{padding:5px 14px}
+  .p-totals .lbl{font-family:var(--serif);letter-spacing:.22em;min-width:105px;text-align:left;color:#333;font-size:10px}
+  .p-totals .val{text-align:right;min-width:155px;font-variant-numeric:tabular-nums;border-bottom:.5px solid #999}
+  .p-totals tr.grand .lbl{color:#000;font-weight:700;font-size:11px}
+  .p-totals tr.grand .val{font-family:var(--serif);font-weight:800;font-size:14.5px;
+    border-top:1px solid #000;border-bottom:3px double #000}
+  .p-lower{display:flex;gap:12px;margin-top:12px}
+  .p-box{border-top:1px solid #000;border-bottom:1px solid #000;flex:1}
+  .p-box .r1{display:flex;border-bottom:.5px solid #AAA;min-height:24px;align-items:center}
+  .p-box .r1:last-child{border-bottom:none}
+  .p-box .lb{width:78px;font-family:var(--serif);font-weight:700;letter-spacing:.24em;
+    font-size:9px;padding:5px 7px;align-self:stretch;display:flex;align-items:center;border-right:.5px solid #AAA}
+  .p-box .bd{flex:1;padding:3px 9px;font-size:10px;display:flex;gap:11px;align-items:center;flex-wrap:wrap}
+  .p-staff{border-collapse:collapse;min-width:180px;border-top:1px solid #000;border-bottom:1px solid #000}
+  .p-staff th{border-bottom:1px solid #000;border-left:.5px solid #AAA;font-family:var(--serif);
+    font-size:9.5px;font-weight:700;padding:5px 10px;letter-spacing:.3em}
+  .p-staff th:first-child{border-left:none}
+  .p-staff td{border-left:.5px solid #AAA;height:42px;text-align:center;font-size:11.5px;min-width:88px;font-family:var(--serif)}
+  .p-staff td:first-child{border-left:none}
+  .p-cust{border:1px solid #000;margin-top:12px;display:flex}
+  .p-cust .side{writing-mode:vertical-rl;font-family:var(--serif);font-weight:700;width:24px;
+    padding:10px 0;font-size:9.5px;letter-spacing:.4em;text-align:center;border-right:1px solid #000;
+    display:flex;align-items:center;justify-content:center}
+  .p-cust .body{flex:1}
+  .p-cust .cr{display:flex;border-bottom:.5px solid #AAA;min-height:30px;align-items:stretch}
+  .p-cust .cr:last-child{border-bottom:none}
+  .p-cust .clb{width:70px;font-family:var(--serif);font-weight:700;letter-spacing:.18em;
+    font-size:8.5px;display:flex;align-items:center;padding:0 7px;border-right:.5px solid #AAA}
+  .p-cust .cbd{flex:1;display:flex;align-items:center;padding:0 8px;font-size:9.5px;gap:12px}
+  .p-checks{font-size:8.5px;padding:5px 8px;border-bottom:.5px solid #AAA;display:flex;gap:14px;letter-spacing:.02em}
+  .p-note{margin-top:11px;font-size:9px;color:#444;text-align:center;letter-spacing:.14em}
+}
+@media(max-width:720px){
+  .sheet{padding:22px 12px;outline:none}
+  .lower{grid-template-columns:1fr}
+  .title{font-size:22px;letter-spacing:.32em}
+  .rate-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="brand"><b>GOLD・S</b>｜買取計算書 発行</div>
+  <div class="spacer"></div>
+  <button class="btn ghost" id="btnHist">発行履歴</button>
+  <button class="btn ghost" id="btnClear">新規伝票</button>
+  <button class="btn ghost" id="btnSave">保存</button>
+  <button class="btn" id="btnCopy">📋 スプレッドシート用にコピー</button>
+  <button class="btn primary" id="btnPrint">🖨 2枚印刷（お客様控＋当社控）</button>
+</div>
+
+<div class="stage"><div class="sheet">
+
+  <div class="sheet-head">
+    <div style="min-width:180px">
+      <div class="field"><label>伝票番号</label><input type="text" id="denpyo" class="denpyo"></div>
+      <div class="field" style="margin-top:8px"><label>取引日</label><input type="date" id="tdate"></div>
+    </div>
+    <div class="title">計算書<small>PURCHASE STATEMENT ― 買取明細 ―</small></div>
+    <div class="company">
+      <div class="name"><b>GOLD・S</b> 株式会社</div>
+      〒574-0062<br>大阪府大東市氷野1-16-3 アーキビル<br>
+      TEL. 072-800-8481<br>FAX. 072-800-8482
+    </div>
+  </div>
+
+  <div class="meta-row">
+    <div class="seller"><input type="text" id="seller" placeholder="お相手先名"><span>様</span></div>
+    <div class="field"><label>金相場価格（基準日）</label><input type="date" id="rateDate"></div>
+  </div>
+
+  <div class="ratebar" id="ratebar">
+    <div class="ratebar-head" id="rateToggle">
+      <span class="tt">◆ 本日の買取単価表</span>
+      <span class="hint">インゴット3つで全品位を自動計算。手直し（赤字）はその日限り・空にすると自動に戻ります</span>
+      <span class="tg2" id="btnRatioSet">掛け率の設定</span>
+      <span class="tg" id="rateTg">たたむ ▲</span>
+    </div>
+    <div class="rate-grid" id="rateGrid"></div>
+  </div>
+
+  <table class="items">
+    <thead><tr>
+      <th>No.</th><th>品名・種別</th><th>詳細（品位）</th><th>備考</th>
+      <th>重量(g)</th><th>単価</th><th>金額</th><th></th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <datalist id="hinniList"></datalist>
+  <datalist id="kindList"></datalist>
+  <button class="add-row" id="btnAdd">＋ 行を追加</button>
+
+  <div class="totals"><table>
+    <tr><td class="lbl">小計（税込）</td><td class="val" id="subtotal">¥ 0</td></tr>
+    <tr class="tax"><td class="lbl">内 消費税(10%)</td><td class="val" id="tax">¥ 0</td></tr>
+    <tr class="grand"><td class="lbl">合　計</td><td class="val" id="grand">¥ 0</td></tr>
+  </table></div>
+
+  <div class="lower">
+    <div class="box">
+      <div class="bx-row">
+        <div class="bx-label">本人確認</div>
+        <div class="bx-body" id="idChecks">
+          <label class="chk"><input type="checkbox" value="運転免許証">運転免許証</label>
+          <label class="chk"><input type="checkbox" value="マイナ保険証">マイナ保険証</label>
+          <label class="chk"><input type="checkbox" value="パスポート">パスポート</label>
+          <label class="chk"><input type="checkbox" value="古物">古物</label>
+          <label class="chk"><input type="checkbox" value="その他">その他</label>
+          <span style="font-size:12px;color:#5A5E66">番号</span><input type="text" id="idNumber" style="width:150px">
+        </div>
+      </div>
+      <div class="bx-row">
+        <div class="bx-label">決　済</div>
+        <div class="bx-body" id="payChecks">
+          <label class="chk"><input type="radio" name="pay" value="現金">現金</label>
+          <label class="chk"><input type="radio" name="pay" value="銀行振込" checked>銀行振込</label>
+          <label class="chk"><input type="radio" name="pay" value="手形">手形</label>
+          <label class="chk"><input type="radio" name="pay" value="預け金">預け金</label>
+          <label class="chk"><input type="radio" name="pay" value="買掛">買掛</label>
+        </div>
+      </div>
+      <div class="bx-row">
+        <div class="bx-label">決済日</div>
+        <div class="bx-body"><input type="date" id="payDate"></div>
+      </div>
+      <div class="bx-row">
+        <div class="bx-label">検査処理</div>
+        <div class="bx-body">
+          <label class="chk"><input type="checkbox" id="chkStone" checked>石外し可</label>
+          <label class="chk"><input type="checkbox" id="chkKizu" checked>傷検査可</label>
+        </div>
+      </div>
+      <div class="bx-row">
+        <div class="bx-label">備　考</div>
+        <div class="bx-body"><input type="text" id="memo" style="width:100%"></div>
+      </div>
+    </div>
+    <div class="staff"><table>
+      <tr><th>責任者</th><th>作成者</th></tr>
+      <tr><td><input type="text" id="mgr"></td><td><input type="text" id="maker"></td></tr>
+    </table></div>
+  </div>
+
+  <div class="cust-note">✎ <span><b>お客様記入欄</b>（氏名・年齢・電話番号・住所・領収金額）は<b>当社控にのみ</b>印刷されます。お客様控はサイン不要のきれいな明細のままお渡しできます。</span></div>
+
+</div></div>
+
+<div class="hist-ov" id="histOv" hidden>
+  <div class="hist-panel">
+    <div class="hist-head"><span class="t">発 行 履 歴</span><span style="flex:1"></span><button class="hcsv" id="histCsv">CSVで書き出し</button><button id="histClose">✕</button></div>
+    <div class="hist-list" id="histList"></div>
+  </div>
+</div>
+
+<div class="hist-ov" id="ratioOv" hidden>
+  <div class="hist-panel">
+    <div class="hist-head"><span class="t">掛 け 率 の 設 定</span><span style="flex:1"></span><button class="hcsv" id="ratioReset">初期値(7/22)に戻す</button><button id="ratioClose">✕</button></div>
+    <div class="hist-list" id="ratioList" style="padding:4px 20px 10px"></div>
+    <div style="padding:12px 20px;border-top:1px solid var(--gold-line);display:flex;gap:10px;justify-content:flex-end;align-items:center">
+      <span style="font-size:11px;color:#8B8578;margin-right:auto">インゴット価格 × この％ ＝ 各品位の単価</span>
+      <button class="hcsv" id="ratioSave" style="font-size:12px;padding:8px 22px">保存して再計算</button>
+    </div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 状態とユーティリティ ================= */
+const KINDS = ["ゴールド","プラチナ","コンビ","シルバー","パラジウム","金貨","銀貨","ダイヤ","ジュエリー","時計","ブランド品","その他"];
+const yen = n => "¥ " + Math.round(n).toLocaleString("ja-JP");
+const $ = id => document.getElementById(id);
+const z2h = s => String(s??"").replace(/[０-９．，]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+const pnum = s => parseFloat(z2h(s).replace(/,/g,""));
+const todayISO = () => { const d=new Date(),p=x=>String(x).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; };
+const jpDate = iso => { if(!iso) return ""; const [y,m,d]=iso.split("-"); return `${y}/${Number(m)}/${Number(d)}`; };
+
+const K_DRAFT="goldsKeisanDraft", K_HIST="goldsKeisanHist";
+const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const lsDel=k=>{try{localStorage.removeItem(k)}catch(e){}};
+
+function todayCode(){
+  const d=new Date(),p=x=>String(x).padStart(2,"0");
+  return `${String(d.getFullYear()).slice(2)}${p(d.getMonth()+1)}${p(d.getDate())}`;
+}
+function genDenpyo(){
+  const code=todayCode(), hist=lsGet(K_HIST)||[];
+  let max=0;
+  hist.forEach(h=>{
+    const m=/^(\d{6})T(\d+)$/.exec(h.denpyo||"");
+    if(m && m[1]===code) max=Math.max(max,parseInt(m[2],10));
+  });
+  return `${code}T${String(max+1).padStart(3,"0")}`;
+}
+
+/* ================= 本日の単価表（公表価格表 準拠） ================= */
+/* 掛け率は 2026/7/22 公表の価格表から逆算。基準（インゴット）を入れると全品位が自動計算 */
+const RATE_DEF = [
+ {cat:"【金】 買取単価 1gあたり", base:"gold", items:[
+  ["金インゴット",23366,true],["K24(純度100%)",22902],["K23(純度95.8%)",21823],
+  ["K22(純度91.6%)",20753],["K21.6(純度90.0%)",20449],["K20(純度83.5%)",18930],
+  ["K18(純度75.0%)",17500],["K17(純度70.0%)",14719],["K14(純度58.5%)",12858],
+  ["K12(純度50.0%)",10519],["K10(純度41.7%)",9117],["K9(純度37.5%)",8065],
+  ["K8(純度33.3%)",5843],["K5(純度21.0%)",2921]]},
+ {cat:"【プラチナ】 買取価格 1gあたり", base:"pt", items:[
+  ["Ptインゴット",9236,true],["Pt1000(純度100%)",9047],["Pt950(純度95.0%)",8632],
+  ["Pt900(純度90.0%)",8859],["Pt850(純度85.0%)",8399],["Pt・Pm",7836]]},
+ {cat:"【金・プラチナコンビ】 買取価格 1gあたり", base:"gold", items:[
+  ["Pt850/K18 Kメイン",16165],["Pt850/K18 半々",12531],["Pt850/K18 Ptメイン",8547],
+  ["Pt900/K18 Kメイン",16211],["Pt900/K18 半々",12761],["Pt900/K18 Ptメイン",8954]]},
+ {cat:"【シルバー】 買取価格 1gあたり", base:"silver", items:[
+  ["Sv1000 インゴット",329,true],["Sv1000(純度100%)",312],["Sv925(純度92.5%)",280]]}
+];
+const BASE_SEED = {gold:23366, pt:9236, silver:329};
+const RATE_META = {}; // name → {base, ratio, isBase, manual}
+RATE_DEF.forEach(sec=>sec.items.forEach(([name,seed,isBase])=>{
+  RATE_META[name]={base:sec.base, ratio:seed/BASE_SEED[sec.base], isBase:!!isBase, manual:false};
+}));
+const RATES = {};   // 品位名 → 本日の単価
+const BASES = {};   // gold/pt/silver → 本日の基準値
+const HINNI = RATE_DEF.flatMap(s=>s.items.map(i=>i[0]));
+const K_RATIO="goldsKeisanRatios";
+const DEFAULT_RATIO = Object.fromEntries(Object.entries(RATE_META).map(([k,m])=>[k,m.ratio]));
+function loadRatios(){
+  const r=lsGet(K_RATIO); if(!r) return;
+  Object.entries(r).forEach(([k,v])=>{ if(RATE_META[k]&&!RATE_META[k].isBase&&v>0) RATE_META[k].ratio=v; });
+}
+function renderRatioModal(){
+  const box=$("ratioList"); box.innerHTML="";
+  RATE_DEF.forEach(sec=>{
+    const h=document.createElement("div"); h.className="rate-cat";
+    h.style.cssText="margin:8px -20px 4px;"; h.textContent=sec.cat; box.appendChild(h);
+    sec.items.forEach(([name,,isBase])=>{
+      const row=document.createElement("div");
+      row.style.cssText="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px";
+      if(isBase){
+        row.innerHTML=`<span style="flex:1">◆ ${name}</span><span style="color:#8B8578;font-size:11.5px">基準（100%）</span>`;
+      }else{
+        const pct=(RATE_META[name].ratio*100).toFixed(2);
+        row.innerHTML=`<span style="flex:1">${name}</span>
+          <input data-rname="${name}" data-init="${pct}" type="text" inputmode="decimal" value="${pct}"
+            style="width:92px;text-align:right;border:none;border-bottom:1px solid var(--line-strong);background:transparent;padding:2px 6px;font-variant-numeric:tabular-nums">
+          <span style="color:#8B8578">%</span>`;
+      }
+      box.appendChild(row);
+    });
+  });
+}
+$("btnRatioSet").addEventListener("click",e=>{
+  e.stopPropagation(); renderRatioModal(); $("ratioOv").hidden=false;
+});
+$("ratioClose").addEventListener("click",()=>$("ratioOv").hidden=true);
+$("ratioOv").addEventListener("click",e=>{ if(e.target.id==="ratioOv") $("ratioOv").hidden=true; });
+$("ratioSave").addEventListener("click",()=>{
+  let changed=0, bad=[];
+  document.querySelectorAll('#ratioList input[data-rname]').forEach(inp=>{
+    if(inp.value===inp.dataset.init) return;  // 未変更は高精度の元値を維持
+    const v=pnum(inp.value);
+    if(isNaN(v)||v<=0||v>200){ bad.push(inp.dataset.rname); return; }
+    RATE_META[inp.dataset.rname].ratio=v/100; changed++;
+  });
+  if(bad.length){ toast("数値が不正です："+bad[0]); return; }
+  const save={}; Object.entries(RATE_META).forEach(([k,m])=>{ if(!m.isBase) save[k]=m.ratio; });
+  lsSet(K_RATIO,save);
+  ["gold","pt","silver"].forEach(k=>{ if(BASES[k]!==undefined) recomputeGroup(k); });
+  renderRates(); clearTimeout(_sv); saveDraft();
+  $("ratioOv").hidden=true;
+  toast(changed?`掛け率を${changed}件更新して再計算しました`:"変更はありませんでした");
+});
+$("ratioReset").addEventListener("click",()=>{
+  if(!confirm("掛け率を初期値（2026/7/22の公表表の比率）に戻します。\n単価の手直し（赤字）も解除して全品位を再計算します。よろしいですか？")) return;
+  Object.entries(DEFAULT_RATIO).forEach(([k,v])=>{ RATE_META[k].ratio=v; });
+  Object.values(RATE_META).forEach(m=>m.manual=false);
+  lsDel(K_RATIO);
+  ["gold","pt","silver"].forEach(k=>{ if(BASES[k]!==undefined) recomputeGroup(k); });
+  renderRates(); renderRatioModal();
+  clearTimeout(_sv); saveDraft();
+  if(!Object.keys(BASES).length) toast("掛け率を初期値に戻しました。インゴット価格（◆印）を入力すると単価が計算されます");
+  else toast("掛け率を初期値に戻し、全品位を再計算しました");
+});
+
+function fmtN(v){ return Math.round(v).toLocaleString("ja-JP"); }
+function recomputeGroup(baseKey){
+  const bv=BASES[baseKey];
+  Object.entries(RATE_META).forEach(([name,m])=>{
+    if(m.base!==baseKey||m.isBase||m.manual) return;
+    if(bv){ RATES[name]=Math.round(bv*m.ratio); } else { delete RATES[name]; }
+    const inp=document.querySelector(`#rateGrid input[data-hinni="${CSS.escape(name)}"]`);
+    if(inp) inp.value = RATES[name]?fmtN(RATES[name]):"";
+    applyRateToRows(name);
+  });
+}
+function renderRates(){
+  const g=$("rateGrid"); g.innerHTML="";
+  RATE_DEF.forEach(sec=>{
+    const h=document.createElement("div"); h.className="rate-cat"; h.textContent=sec.cat; g.appendChild(h);
+    sec.items.forEach(([name,,isBase])=>{
+      const c=document.createElement("div");
+      c.className="rate-cell"+(isBase?" base":"");
+      c.innerHTML=`<label>${isBase?"◆ ":""}${name}</label><input type="text" inputmode="numeric" data-hinni="${name}" placeholder="—">`;
+      const inp=c.querySelector("input"), meta=RATE_META[name];
+      if(meta.manual) c.classList.add("manual");
+      if(RATES[name]) inp.value=fmtN(RATES[name]);
+      inp.addEventListener("input",()=>{
+        const v=pnum(inp.value);
+        if(meta.isBase){
+          if(isNaN(v)) delete BASES[meta.base]; else BASES[meta.base]=v;
+          if(!isNaN(v)) RATES[name]=v; else delete RATES[name];
+          recomputeGroup(meta.base);
+        }else{
+          if(inp.value.trim()===""){ delete RATES[name]; }
+          else{
+            meta.manual=true; c.classList.add("manual");
+            if(isNaN(v)) delete RATES[name]; else RATES[name]=v;
+          }
+        }
+        applyRateToRows(name);
+      });
+      inp.addEventListener("blur",()=>{
+        if(!meta.isBase && inp.value.trim()===""){
+          meta.manual=false; c.classList.remove("manual");
+          const bv=BASES[meta.base];
+          if(bv!==undefined) RATES[name]=Math.round(bv*meta.ratio);
+          applyRateToRows(name); queueSave();
+        }
+        if(RATES[name]) inp.value=fmtN(RATES[name]);
+      });
+      g.appendChild(c);
+    });
+  });
+  $("hinniList").innerHTML=HINNI.map(h=>`<option value="${h}">`).join("");
+  $("kindList").innerHTML=KINDS.map(k=>`<option value="${k}">`).join("");
+}
+function applyRateToRows(hinni){
+  [...$("rows").children].forEach(tr=>{
+    const d=tr.querySelector(".c-detail input"), p=tr.querySelector(".c-price input");
+    if(d.value===hinni && (p.dataset.fromRate==="1" || p.value==="")){
+      p.value = RATES[hinni] ? fmtN(RATES[hinni]) : "";
+      p.dataset.fromRate="1";
+      p.dispatchEvent(new Event("input"));
+      p.dataset.fromRate="1";
+    }
+  });
+}
+function clearRates(){
+  Object.keys(RATES).forEach(k=>delete RATES[k]);
+  Object.keys(BASES).forEach(k=>delete BASES[k]);
+  Object.values(RATE_META).forEach(m=>m.manual=false);
+  renderRates();
+}
+$("rateToggle").addEventListener("click",()=>{
+  const rb=$("ratebar"); rb.classList.toggle("closed");
+  $("rateTg").textContent = rb.classList.contains("closed") ? "ひらく ▼" : "たたむ ▲";
+});
+
+/* Enterで次の入力欄へ（Excel風） */
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Enter") return;
+  const t=e.target;
+  if(!(t instanceof HTMLInputElement) || !t.closest(".sheet")) return;
+  e.preventDefault();
+  const list=[...document.querySelectorAll('.sheet input:not([type=checkbox]):not([type=radio])')]
+    .filter(el=>el.offsetParent!==null);
+  const i=list.indexOf(t);
+  if(i>-1 && i<list.length-1) list[i+1].focus(); else t.blur();
+});
+
+/* 候補付き入力欄：タップしたら全候補が出る（値は消えず、選ばなければ元に戻る） */
+function comboBehavior(inp){
+  inp.addEventListener("focus",()=>{
+    if(inp.value!==""){
+      inp.dataset.prev=inp.value;
+      inp.dataset.ph=inp.placeholder||"";
+      inp.placeholder=inp.value;
+      inp.value="";
+    }
+  });
+  inp.addEventListener("blur",()=>{
+    if(inp.value==="" && inp.dataset.prev) inp.value=inp.dataset.prev;
+    if(inp.dataset.ph!==undefined){ inp.placeholder=inp.dataset.ph; delete inp.dataset.ph; }
+    delete inp.dataset.prev;
+  });
+}
+
+/* ================= 明細行 ================= */
+function addRow(data={}){
+  const tb=$("rows"), tr=document.createElement("tr");
+  tr.innerHTML = `
+    <td class="no"></td>
+    <td class="c-kind"><input type="text" list="kindList" value="${data.kind||""}" placeholder="ゴールド"></td>
+    <td class="c-detail"><input type="text" list="hinniList" value="${data.detail||""}" placeholder="K18(純度75.0%) など"></td>
+    <td><input type="text" value="${data.note||""}"></td>
+    <td class="c-weight"><input type="text" inputmode="decimal" value="${data.weight??""}"></td>
+    <td class="c-price"><input type="text" inputmode="numeric" value="${data.price??""}"></td>
+    <td class="c-amount"><input type="text" inputmode="numeric" value="${data.amount??""}"></td>
+    <td class="row-tools"><button class="row-del" title="行を削除">✕</button></td>`;
+  const [wI,pI,aI] = [tr.querySelector(".c-weight input"),tr.querySelector(".c-price input"),tr.querySelector(".c-amount input")];
+  const auto = ()=>{
+    const w=pnum(wI.value), p=pnum(pI.value);
+    if(!isNaN(w)&&!isNaN(p)){ aI.value=Math.round(w*p).toLocaleString("ja-JP"); aI.dataset.auto="1"; }
+    recalc();
+  };
+  wI.addEventListener("input",auto); pI.addEventListener("input",auto);
+  pI.addEventListener("keydown",()=>{ delete pI.dataset.fromRate; });
+  const dI=tr.querySelector(".c-detail input");
+  comboBehavior(tr.querySelector(".c-kind input"));
+  comboBehavior(dI);
+  dI.addEventListener("input",()=>{
+    if(RATES[dI.value] && (pI.value===""||pI.dataset.fromRate==="1")){
+      pI.value=RATES[dI.value].toLocaleString("ja-JP");
+      pI.dataset.fromRate="1"; auto(); pI.dataset.fromRate="1";
+    }
+  });
+  aI.addEventListener("input",()=>{ delete aI.dataset.auto; recalc(); });
+  aI.addEventListener("blur",()=>{ const v=pnum(aI.value); if(!isNaN(v)) aI.value=v.toLocaleString("ja-JP"); });
+  tr.querySelector(".row-del").addEventListener("click",()=>{ tr.remove(); renumber(); recalc(); });
+  tb.appendChild(tr); renumber();
+  return tr;
+}
+function renumber(){ [...$("rows").children].forEach((tr,i)=>tr.querySelector(".no").textContent=i+1); }
+function rowsData(){
+  return [...$("rows").children].map(tr=>{
+    const g=s=>tr.querySelector(s), num=el=>pnum(el.value);
+    return { kind:g(".c-kind input").value, detail:g(".c-detail input").value,
+      note:g("td:nth-child(4) input").value, weight:g(".c-weight input").value,
+      price:num(g(".c-price input")), amount:num(g(".c-amount input")) };
+  }).filter(r=>r.kind||r.detail||r.note||r.weight||!isNaN(r.amount));
+}
+function recalc(){
+  const total=rowsData().reduce((s,r)=>s+(isNaN(r.amount)?0:r.amount),0);
+  $("subtotal").textContent=yen(total);
+  $("tax").textContent=yen(total*10/110);
+  $("grand").textContent=yen(total);
+}
+
+/* ================= 初期化 ================= */
+function init(clear){
+  $("rows").innerHTML="";
+  for(let i=0;i<15;i++) addRow();
+  $("denpyo").value=genDenpyo(); $("tdate").value=todayISO();
+  $("rateDate").value=todayISO(); $("payDate").value="";
+  if(clear){ clearRates();
+    $("seller").value=""; $("idNumber").value=""; $("memo").value=""; $("mgr").value=""; $("maker").value="";
+    document.querySelectorAll("#idChecks input").forEach(c=>c.checked=false);
+    document.querySelector('#payChecks input[value="銀行振込"]').checked=true;
+    $("chkStone").checked=true; $("chkKizu").checked=true; }
+  recalc();
+}
+$("btnAdd").addEventListener("click",()=>addRow());
+
+/* ================= 保存・復元・履歴 ================= */
+function snapshot(){
+  return {
+    day:todayISO(),
+    denpyo:$("denpyo").value, tdate:$("tdate").value, seller:$("seller").value, rateDate:$("rateDate").value,
+    idChecks:[...document.querySelectorAll("#idChecks input")].map(c=>c.checked),
+    idNumber:$("idNumber").value,
+    pay:(document.querySelector('#payChecks input:checked')||{}).value||"",
+    payDate:$("payDate").value, chkStone:$("chkStone").checked, chkKizu:$("chkKizu").checked,
+    memo:$("memo").value, mgr:$("mgr").value, maker:$("maker").value,
+    bases:{...BASES}, rates:{...RATES},
+    manual:Object.keys(RATE_META).filter(k=>RATE_META[k].manual),
+    rows:[...$("rows").children].map(tr=>({
+      kind:tr.querySelector(".c-kind input").value,
+      detail:tr.querySelector(".c-detail input").value,
+      note:tr.querySelector("td:nth-child(4) input").value,
+      weight:tr.querySelector(".c-weight input").value,
+      price:tr.querySelector(".c-price input").value,
+      amount:tr.querySelector(".c-amount input").value,
+      fr:tr.querySelector(".c-price input").dataset.fromRate||""
+    }))
+  };
+}
+function applySnapshot(s){
+  clearRates();
+  Object.assign(BASES, s.bases||{});
+  Object.assign(RATES, s.rates||{});
+  (s.manual||[]).forEach(k=>{ if(RATE_META[k]) RATE_META[k].manual=true; });
+  renderRates();
+  $("denpyo").value=s.denpyo||genDenpyo();
+  $("tdate").value=s.tdate||todayISO();
+  $("rateDate").value=s.rateDate||todayISO();
+  $("seller").value=s.seller||"";
+  const idc=document.querySelectorAll("#idChecks input");
+  (s.idChecks||[]).forEach((v,i)=>{ if(idc[i]) idc[i].checked=v; });
+  $("idNumber").value=s.idNumber||"";
+  if(s.pay){ const r=document.querySelector(`#payChecks input[value="${s.pay}"]`); if(r) r.checked=true; }
+  $("payDate").value=s.payDate||"";
+  $("chkStone").checked=s.chkStone!==false; $("chkKizu").checked=s.chkKizu!==false;
+  $("memo").value=s.memo||""; $("mgr").value=s.mgr||""; $("maker").value=s.maker||"";
+  $("rows").innerHTML="";
+  const rows=(s.rows&&s.rows.length)?s.rows:Array.from({length:15},()=>({}));
+  rows.forEach(r=>{
+    const tr=addRow(r);
+    if(r.fr) tr.querySelector(".c-price input").dataset.fromRate="1";
+  });
+  renumber(); recalc();
+}
+let _sv=null;
+function saveDraft(){ lsSet(K_DRAFT, snapshot()); }
+function queueSave(){ clearTimeout(_sv); _sv=setTimeout(saveDraft,400); }
+document.addEventListener("input",e=>{ if(e.target.closest&&e.target.closest(".sheet")) queueSave(); });
+document.addEventListener("change",e=>{ if(e.target.closest&&e.target.closest(".sheet")) queueSave(); });
+window.addEventListener("beforeunload",()=>{ clearTimeout(_sv); saveDraft(); });
+
+function pushHistory(){
+  const s=snapshot();
+  const total=rowsData().reduce((t,r)=>t+(isNaN(r.amount)?0:r.amount),0);
+  const hist=lsGet(K_HIST)||[];
+  const i=hist.findIndex(h=>h.denpyo===s.denpyo);
+  if(i>-1) hist.splice(i,1);
+  hist.unshift({t:Date.now(), denpyo:s.denpyo, date:s.tdate, seller:s.seller, total, snap:s});
+  if(hist.length>300) hist.length=300;
+  lsSet(K_HIST,hist);
+}
+function renderHist(){
+  const hist=lsGet(K_HIST)||[], box=$("histList");
+  if(!hist.length){ box.innerHTML='<div class="hist-empty">まだ発行履歴がありません。「2枚印刷」した伝票がここに残ります。</div>'; return; }
+  box.innerHTML="";
+  hist.forEach((h,idx)=>{
+    const row=document.createElement("div"); row.className="hist-row";
+    row.innerHTML=`<span class="dn">${h.denpyo}</span><span class="sl">${jpDate(h.date)}　${(h.seller||"（名称未入力）")}</span>
+      <span class="tt">${yen(h.total)}</span>
+      <button class="hbtn">ひらく</button><button class="hdel" title="削除">✕</button>`;
+    row.querySelector(".hbtn").addEventListener("click",()=>{
+      applySnapshot(h.snap); saveDraft(); $("histOv").hidden=true;
+      toast(`伝票 ${h.denpyo} を開きました`);
+    });
+    row.querySelector(".hdel").addEventListener("click",()=>{
+      if(!confirm(`履歴 ${h.denpyo} を削除しますか？`)) return;
+      const hist2=lsGet(K_HIST)||[]; hist2.splice(idx,1); lsSet(K_HIST,hist2); renderHist();
+    });
+    box.appendChild(row);
+  });
+}
+$("histCsv").addEventListener("click",()=>{
+  const hist=lsGet(K_HIST)||[];
+  if(!hist.length){ toast("書き出す履歴がありません"); return; }
+  const head=["伝票番号","取引日","お相手先","No","品名・種別","詳細","備考","重量(g)","単価","金額","伝票合計","発行日時"];
+  const lines=[head.join(",")];
+  const q=s=>'"'+String(s??"").replace(/"/g,'""')+'"';
+  hist.slice().reverse().forEach(h=>{
+    const rows=(h.snap&&h.snap.rows||[]).filter(r=>r.kind||r.detail||r.note||r.weight||r.amount);
+    const dt=new Date(h.t).toLocaleString("ja-JP");
+    if(!rows.length){ lines.push([h.denpyo,jpDate(h.date),q(h.seller),"","","","","","","",h.total,q(dt)].join(",")); return; }
+    rows.forEach((r,i)=>{
+      lines.push([h.denpyo,jpDate(h.date),q(h.seller),i+1,q(r.kind),q(r.detail),q(r.note),
+        r.weight,String(r.price).replace(/,/g,""),String(r.amount).replace(/,/g,""),
+        i===0?h.total:"",i===0?q(dt):""].join(","));
+    });
+  });
+  const blob=new Blob(["\ufeff"+lines.join("\r\n")],{type:"text/csv"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="発行履歴_"+todayCode()+".csv";
+  a.click(); URL.revokeObjectURL(a.href);
+  toast("CSVを書き出しました（ダウンロードフォルダ）");
+});
+$("btnHist").addEventListener("click",()=>{ renderHist(); $("histOv").hidden=false; });
+$("histClose").addEventListener("click",()=>$("histOv").hidden=true);
+$("histOv").addEventListener("click",e=>{ if(e.target.id==="histOv") $("histOv").hidden=true; });
+
+$("btnClear").addEventListener("click",()=>{
+  if(!confirm("新しい伝票を開始します。伝票番号は次の番号に進み、お相手先と明細はクリアされます。（本日の単価表は保持されます）")) return;
+  const keep={bases:{...BASES}, rates:{...RATES}, manual:Object.keys(RATE_META).filter(k=>RATE_META[k].manual)};
+  init(true);
+  Object.assign(BASES,keep.bases); Object.assign(RATES,keep.rates);
+  keep.manual.forEach(k=>{ if(RATE_META[k]) RATE_META[k].manual=true; });
+  renderRates();
+  Object.keys(RATES).forEach(k=>{ if(RATE_META[k]&&RATE_META[k].isBase) recomputeGroup(RATE_META[k].base); });
+  saveDraft();
+  toast("新しい伝票を開始しました（単価表は保持）");
+});
+
+
+/* ================= スプレッドシート転記 ================= */
+$("btnCopy").addEventListener("click",async()=>{
+  const rd=rowsData();
+  if(!rd.length){ toast("明細が空です"); return; }
+  const head=["伝票番号","取引日","お相手先","No","品名・種別","詳細","備考","重量(g)","単価","金額","合計","決済方法","責任者","作成者"];
+  const pay=(document.querySelector('#payChecks input:checked')||{}).value||"";
+  const total=rd.reduce((s,r)=>s+(isNaN(r.amount)?0:r.amount),0);
+  const lines=rd.map((r,i)=>[
+    $("denpyo").value, jpDate($("tdate").value), $("seller").value, i+1,
+    r.kind, r.detail, r.note, r.weight, isNaN(r.price)?"":r.price, isNaN(r.amount)?"":r.amount,
+    i===0?total:"", i===0?pay:"", i===0?$("mgr").value:"", i===0?$("maker").value:""
+  ].join("\t"));
+  const tsv=[head.join("\t"),...lines].join("\n");
+  try{ await navigator.clipboard.writeText(tsv); toast("コピーしました。スプレッドシートに貼り付けてください"); }
+  catch(e){
+    const ta=document.createElement("textarea"); ta.value=tsv; document.body.appendChild(ta);
+    ta.select(); document.execCommand("copy"); ta.remove();
+    toast("コピーしました。スプレッドシートに貼り付けてください");
+  }
+});
+
+/* ================= 印刷（2枚） ================= */
+$("btnPrint").addEventListener("click",()=>{
+  const hist=lsGet(K_HIST)||[], cur=$("denpyo").value;
+  const ex=hist.find(h=>h.denpyo===cur);
+  if(ex){
+    const total=rowsData().reduce((t,r)=>t+(isNaN(r.amount)?0:r.amount),0);
+    const changed=(ex.seller!==$("seller").value)||(ex.total!==total);
+    if(changed && !confirm("伝票番号 "+cur+" は発行済みです。内容が変わっていますが、同じ番号で上書き発行しますか？\n\n※新しいお客様の伝票の場合は「キャンセル」して「新規伝票」ボタンを押してください。")) return;
+  }
+  buildPrint(); pushHistory(); saveDraft(); window.print(); toast("発行履歴に保存しました");
+});
+$("btnSave").addEventListener("click",()=>{ saveDraft(); toast("保存しました（入力中も自動保存されています）"); });
+
+function esc(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function chkMark(b){ return b?"☑":"☐"; }
+
+function buildPrint(){
+  const rd=rowsData(), total=rd.reduce((s,r)=>s+(isNaN(r.amount)?0:r.amount),0);
+  const idSel=[...document.querySelectorAll("#idChecks input")].map(c=>`${chkMark(c.checked)} ${c.value}`).join("　");
+  const pays=[...document.querySelectorAll("#payChecks input")].map(c=>`${chkMark(c.checked)} ${c.value}`).join("　");
+  const itemRows = Array.from({length:Math.max(rd.length,20)},(_,i)=>{
+    const r=rd[i]||{};
+    return `<tr><td class="no">${i+1}</td><td>${esc(r.kind)}</td><td>${esc(r.detail)}</td><td>${esc(r.note)}</td>
+      <td class="r">${esc(r.weight)}</td><td class="r">${isNaN(r.price)?"":("¥"+r.price.toLocaleString())}</td>
+      <td class="r">${isNaN(r.amount)?"":("¥"+r.amount.toLocaleString())}</td></tr>`;
+  }).join("");
+
+  const sheetHTML = (copyLabel, withCust) => `
+  <div class="pcopy">
+    <div class="p-head">
+      <div style="min-width:170px;font-size:10.5px;line-height:2">
+        伝票番号：${esc($("denpyo").value)}<br>取引日：${jpDate($("tdate").value)}
+      </div>
+      <div style="flex:1">
+        <div class="p-title">計算書（買）</div>
+        <div class="p-sub">PURCHASE STATEMENT ― 買取明細 ―</div>
+        <div class="p-copychk">${copyLabel==="お客様控"?"☑":"☐"} お客様控　${copyLabel==="当社控"?"☑":"☐"} 当社控</div>
+      </div>
+      <div class="p-company">
+        <div class="name">GOLD・S株式会社</div>
+        〒574-0062<br>大阪府大東市氷野1-16-3 アーキビル<br>TEL. 072-800-8481<br>FAX. 072-800-8482
+      </div>
+    </div>
+    <div class="p-meta">
+      <div class="l"><span class="p-seller">${esc($("seller").value)}</span> 様</div>
+      <div style="font-size:10.5px">金相場価格：${jpDate($("rateDate").value)}</div>
+    </div>
+    <table class="p-items">
+      <thead><tr><th>No.</th><th>品名・種別</th><th>詳細</th><th>備考</th><th>重量(g)</th><th>単価</th><th>金額</th></tr></thead>
+      <tbody>${itemRows}</tbody>
+    </table>
+    <div class="p-totals"><table>
+      <tr><td class="lbl">小計（税込）</td><td class="val">${yen(total)}</td></tr>
+      <tr><td class="lbl">内 消費税(10%)</td><td class="val">${yen(total*10/110)}</td></tr>
+      <tr class="grand"><td class="lbl">合　計</td><td class="val">${yen(total)}</td></tr>
+    </table></div>
+    <div class="p-lower">
+      <div class="p-box">
+        <div class="r1"><div class="lb">本人確認</div><div class="bd">${idSel}　番号：${esc($("idNumber").value)}</div></div>
+        <div class="r1"><div class="lb">決　済</div><div class="bd">${pays}</div></div>
+        <div class="r1"><div class="lb">決済日</div><div class="bd">${jpDate($("payDate").value)}</div></div>
+        <div class="r1"><div class="lb">検査処理</div><div class="bd">${chkMark($("chkStone").checked)} 石外し可　${chkMark($("chkKizu").checked)} 傷検査可</div></div>
+        <div class="r1"><div class="lb">備　考</div><div class="bd">${esc($("memo").value)}</div></div>
+      </div>
+      <table class="p-staff">
+        <tr><th>責任者</th><th>作成者</th></tr>
+        <tr><td>${esc($("mgr").value)}</td><td>${esc($("maker").value)}</td></tr>
+      </table>
+    </div>
+    ${withCust?`
+    <div class="p-cust">
+      <div class="side">お客様記入欄</div>
+      <div class="body">
+        <div class="p-checks">☐ 古物商特例対象　☐ 売主は適格請求書発行事業者ではない　☐ 売主が適格請求書発行事業者の場合：登録番号 T</div>
+        <div class="cr"><div class="clb">氏　名</div><div class="cbd"></div><div class="clb" style="border-left:1px solid #999">年　齢</div><div class="cbd" style="max-width:70px"></div><div class="clb" style="border-left:1px solid #999">電話番号</div><div class="cbd" style="max-width:150px"></div></div>
+        <div class="cr" style="min-height:44px"><div class="clb">住　所</div><div class="cbd" style="font-size:8.5px;color:#888">都道府県</div></div>
+        <div class="cr"><div class="clb">領収金額</div><div class="cbd"></div><div class="clb" style="border-left:1px solid #999">署　名</div><div class="cbd"></div></div>
+      </div>
+    </div>`:`
+    <div class="p-note">本書はお買取内容の明細（お客様控）でございます。大切にご保管ください。</div>`}
+  </div>`;
+
+  $("printArea").innerHTML = sheetHTML("お客様控",false) + sheetHTML("当社控",true);
+}
+
+function toast(msg){
+  const t=$("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove("show"),2600);
+}
+
+(function boot(){
+  loadRatios();
+  const d=lsGet(K_DRAFT);
+  if(d && (d.rows||[]).some(r=>r.kind||r.detail||r.weight||r.amount) ){
+    applySnapshot(d);
+    toast("前回の入力を復元しました（新しい伝票は「新規伝票」から）");
+  }else if(d && d.rates && Object.keys(d.rates).length){
+    applySnapshot(d);
+  }else{
+    init(true);
+  }
+  // 手直し（赤字）は当日限り：日付が変わっていたら自動解除
+  if(d && d.day && d.day!==todayISO() && (d.manual||[]).length){
+    Object.values(RATE_META).forEach(m=>m.manual=false);
+    renderRates();
+    clearTimeout(_sv); saveDraft();
+    toast("日付が変わったため、昨日の単価手直しをリセットしました。本日のインゴット価格を入力してください");
+  }
+})();
+</script>
+</body>
+</html>
