@@ -103,6 +103,7 @@ table.items td{border-bottom:1px solid var(--line);border-left:1px solid var(--l
 table.items td:first-child{border-left:none}
 table.items td.no{width:36px;text-align:center;color:var(--pt);font-variant-numeric:tabular-nums;font-size:11.5px}
 table.items input,table.items select{width:100%;height:36px;border:none;background:transparent;padding:0 9px;font-size:13px}
+table.items input.err{box-shadow:inset 0 0 0 1.5px var(--danger);background:#FFF3F3}
 table.items select{appearance:none;-webkit-appearance:none;cursor:pointer}
 td.c-kind{width:98px}
 td.c-detail{width:172px}
@@ -141,12 +142,14 @@ td.c-amount input{font-weight:700}
 .chk{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap}
 .chk input{accent-color:var(--gold);width:14px;height:14px}
 .bx-body input[type=text],.bx-body input[type=date]{border:none;border-bottom:1px solid var(--line-strong);background:transparent;padding:2px 5px;font-size:12.5px}
+#memo{border-bottom:none!important}
 .staff{border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
 .staff th{font-family:var(--serif);color:var(--ink);font-weight:700;font-size:12px;padding:9px;
   border-bottom:1.5px solid var(--ink);letter-spacing:.3em}
 .staff td{border-left:1px solid var(--line);padding:4px;height:64px;vertical-align:middle}
 .staff td:first-child{border-left:none}
-.staff input{width:100%;border:none;text-align:center;font-size:14px;background:transparent;font-family:var(--serif)}
+.staff input{width:100%;box-sizing:border-box;border:none;text-align:center;font-size:14px;
+  background:transparent;font-family:var(--serif);padding:12px 8px;border-bottom:1px solid var(--line-strong)}
 .staff table{width:100%;border-collapse:collapse}
 
 /* ===== お客様記入欄（画面上は説明のみ） ===== */
@@ -594,34 +597,42 @@ function addRow(data={}){
   const tb=$("rows"), tr=document.createElement("tr");
   tr.innerHTML = `
     <td class="no"></td>
-    <td class="c-kind"><input type="text" list="kindList" value="${data.kind||""}" placeholder="ゴールド"></td>
-    <td class="c-detail"><input type="text" list="hinniList" value="${data.detail||""}" placeholder="K18(純度75.0%) など"></td>
+    <td class="c-kind"><input type="text" list="kindList" value="${data.kind||""}" placeholder="品名を選ぶ"></td>
+    <td class="c-detail"><input type="text" list="hinniList" value="${data.detail||""}" placeholder="詳細を選ぶ"></td>
     <td><input type="text" value="${data.note||""}"></td>
     <td class="c-weight"><input type="text" inputmode="decimal" value="${data.weight??""}"></td>
     <td class="c-price"><input type="text" inputmode="numeric" value="${data.price??""}"></td>
     <td class="c-amount"><input type="text" inputmode="numeric" value="${data.amount??""}"></td>
     <td class="row-tools"><button class="row-del" title="行を削除">✕</button></td>`;
   const [wI,pI,aI] = [tr.querySelector(".c-weight input"),tr.querySelector(".c-price input"),tr.querySelector(".c-amount input")];
+  const kI0=tr.querySelector(".c-kind input"), dI0=tr.querySelector(".c-detail input");
+  function checkRequired(){
+    const hasQty = wI.value.trim()!==""||aI.value.trim()!=="";
+    kI0.classList.toggle("err", hasQty && kI0.value.trim()==="");
+    dI0.classList.toggle("err", hasQty && dI0.value.trim()==="");
+  }
   const auto = ()=>{
     const w=pnum(wI.value), p=pnum(pI.value);
     if(!isNaN(w)&&!isNaN(p)){ aI.value=Math.round(w*p).toLocaleString("ja-JP"); aI.dataset.auto="1"; }
-    recalc();
+    recalc(); checkRequired();
   };
   wI.addEventListener("input",auto); pI.addEventListener("input",auto);
   pI.addEventListener("keydown",()=>{ delete pI.dataset.fromRate; });
   const dI=tr.querySelector(".c-detail input");
   comboBehavior(tr.querySelector(".c-kind input"));
   comboBehavior(dI);
+  tr.querySelector(".c-kind input").addEventListener("blur",checkRequired);
+  dI.addEventListener("blur",checkRequired);
   dI.addEventListener("input",()=>{
     if(RATES[dI.value] && (pI.value===""||pI.dataset.fromRate==="1")){
       pI.value=RATES[dI.value].toLocaleString("ja-JP");
       pI.dataset.fromRate="1"; auto(); pI.dataset.fromRate="1";
     }
   });
-  aI.addEventListener("input",()=>{ delete aI.dataset.auto; recalc(); });
+  aI.addEventListener("input",()=>{ delete aI.dataset.auto; recalc(); checkRequired(); });
   aI.addEventListener("blur",()=>{ const v=pnum(aI.value); if(!isNaN(v)) aI.value=v.toLocaleString("ja-JP"); });
   tr.querySelector(".row-del").addEventListener("click",()=>{ tr.remove(); renumber(); recalc(); });
-  tb.appendChild(tr); renumber();
+  tb.appendChild(tr); renumber(); checkRequired();
   return tr;
 }
 function renumber(){ [...$("rows").children].forEach((tr,i)=>tr.querySelector(".no").textContent=i+1); }
